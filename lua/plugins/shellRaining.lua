@@ -1,3 +1,10 @@
+local cb = function()
+  if vim.g.colors_name == "tokyonight" then
+    return "#806d9c"
+  else
+    return "#00ffff"
+  end
+end
 return {
   "shellRaining/hlchunk.nvim",
   event = { "BufReadPre", "BufNewFile" },
@@ -12,8 +19,11 @@ return {
           left_bottom = "└",
           right_arrow = "─",
         },
-        style = "#00ffff",
-      },
+        style = {
+        { fg = cb },
+        { fg = "#f35336" },
+    },
+    },
       indent = {
         enable = true,
         chars = {
