@@ -1,10 +1,3 @@
-local cb = function()
-  if vim.g.colors_name == "tokyonight" then
-    return "#806d9c"
-  else
-    return "#00ffff"
-  end
-end
 return {
   "shellRaining/hlchunk.nvim",
   event = { "BufReadPre", "BufNewFile" },
@@ -12,35 +5,16 @@ return {
     require("hlchunk").setup({
       chunk = {
         enable = true,
-        chars = {
-          horizontal_line = "─",
-          vertical_line = "│",
-          left_top = "┌",
-          left_bottom = "└",
-          right_arrow = "─",
-        },
-        style = {
-        { fg = cb },
-        { fg = "#f35336" },
-    },
-    },
-      indent = {
-        enable = true,
-        chars = {
-          "│",
-        },
-        style = {
-          vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID("Whitespace")), "fg", "gui"),
-        },
+        style = "#ff7f50",
       },
       line_num = {
         enable = true,
-        style = "#806d9c",
+        style = "#32cd32",
       },
       blank = {
         enable = true,
         chars = {
-          " ",
+          "  ",
         },
         style = {
           { bg = "#434437" },
