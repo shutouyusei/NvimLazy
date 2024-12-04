@@ -13,3 +13,9 @@ vim.opt.ambiwidth = "single"
 -- language
 vim.opt.spell = true
 vim.opt.spelllang = { "en_us" }
+
+-- fold method
+vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+vim.opt.foldtext = "v:lua.vim.treesitter.foldext()"
+vim.opt.foldmethod = "indent"
+vim.opt.foldlevel = 1
