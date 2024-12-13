@@ -3,3 +3,5 @@
 -- Add any additional keymaps here
 -- ESC設定
 vim.keymap.set("i", "jj", "<ESC>")
+-- ターミナルノーマルモードへの変更
+vim.keymap.set("t", "jj", "<C-\\><C-n>")
