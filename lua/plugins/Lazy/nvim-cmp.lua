@@ -1,6 +1,6 @@
 return {
   {
-    "nvim-cmp",
+    "saghen/blink.cmp",
     optional = true,
     dependencies = { -- this will only be evaluated if nvim-cmp is enabled
       {
@@ -18,11 +18,12 @@ return {
         end,
         specs = {
           {
-            "nvim-cmp",
-            optional = true,
+            "saghen/blink.cmp",
+
             ---@param opts cmp.ConfigSchema
             opts = function(_, opts)
               table.insert(opts.sources, 1, {
+
                 name = "copilot",
                 group_index = 1,
                 priority = 100,
