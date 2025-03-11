@@ -14,8 +14,9 @@ return {
       blank = {
         enable = true,
         chars = {
-          "  ",
+          "|",
         },
+
         style = {
           { bg = "#434437" },
           { bg = "#2f4440" },
