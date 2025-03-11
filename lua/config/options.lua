@@ -20,3 +20,7 @@ vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 vim.opt.foldtext = "v:lua.vim.treesitter.foldext()"
 vim.opt.foldmethod = "indent"
 vim.opt.foldlevel = 1
+
+-- opcaity
+vim.opt.winblend = 10
+vim.opt.pumblend = 10
