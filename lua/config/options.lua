@@ -24,3 +24,6 @@ vim.opt.foldlevel = 1
 -- opcaity
 vim.opt.winblend = 10
 vim.opt.pumblend = 10
+
+-- terminal
+vim.env.TERM_PROGRAM = "WezTerm"

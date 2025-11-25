@@ -2,13 +2,19 @@ local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 
 config.default_prog = { "pwsh" }
-config.color_scheme = "Tokyo Night"
+config.color_scheme = "Catppuccin Latte"
 config.automatically_reload_config = true
 config.font_size = 11.0
 config.use_ime = true
-config.window_background_opacity = 0.7
-config.macos_window_background_blur = 0
-
+config.window_background_opacity =0.6
+config.macos_window_background_blur = 1 
+config.foreground_text_hsb = {
+  hue = 1.0,
+  saturation = 1.3,   -- 彩度：1.2 (少し鮮やかにするとはっきり見える)
+  brightness = 0.8,   -- 明度：0.7 (数値を下げると黒に近づき、濃くなる)
+}
+config.font = wezterm.font("JetBrains Mono", { weight = "Medium" })
+config.bold_brightens_ansi_colors = "No"
 ----------------------------------------------------
 -- Tab
 ----------------------------------------------------
@@ -30,9 +36,9 @@ config.window_frame = {
 }
 
 -- タブバーを背景色に合わせる
-config.window_background_gradient = {
-	colors = { "#000000" },
-}
+-- config.window_background_gradient = {
+-- 	colors = { "#000000" },
+-- }
 
 -- タブの追加ボタンを非表示
 config.show_new_tab_button_in_tab_bar = false
