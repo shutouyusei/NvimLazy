@@ -13,7 +13,7 @@ vim.opt.ambiwidth = "single"
 
 -- language
 vim.opt.spell = true
-vim.opt.spelllang = { "en_us" }
+vim.opt.spelllang = { "en_us", "cjk" }
 
 -- fold method
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
