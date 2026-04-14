@@ -6,7 +6,7 @@ vim.opt.encoding = "utf-8"
 vim.scriptencoding = "utf-8"
 vim.opt.fileencoding = "utf-8"
 vim.opt.fileencodings = "ucs-bom,utf-8,euc-jp,cp932"
-vim.bo.shiftwidth = 4
+vim.opt.shiftwidth = 4
 vim.opt.ambiwidth = "single"
 
 -- color
@@ -17,8 +17,8 @@ vim.opt.spelllang = { "en_us", "cjk" }
 
 -- fold method
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
-vim.opt.foldtext = "v:lua.vim.treesitter.foldext()"
-vim.opt.foldmethod = "indent"
+vim.opt.foldtext = "v:lua.vim.treesitter.foldtext()"
+vim.opt.foldmethod = "manual"
 vim.opt.foldlevel = 1
 
 -- opcaity

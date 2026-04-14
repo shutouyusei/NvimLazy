@@ -1,8 +1,8 @@
 return {
   {
     "nvim-treesitter/nvim-treesitter",
-    ensure_installed = "all",
     opts = {
+      ensure_installed = "all",
       highlight = {
         enable = true,
       },
