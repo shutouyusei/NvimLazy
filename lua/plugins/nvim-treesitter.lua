@@ -1,11 +1,37 @@
 return {
-  {
-    "nvim-treesitter/nvim-treesitter",
-    opts = {
-      ensure_installed = "all",
-      highlight = {
-        enable = true,
-      },
-    },
-  },
+	{
+		"nvim-treesitter/nvim-treesitter",
+		opts = {
+			ensure_installed = {
+				"bash",
+				"c",
+				"cpp",
+				"css",
+				"diff",
+				"html",
+				"javascript",
+				"json",
+				"jsonc",
+				"latex",
+				"lua",
+				"luadoc",
+				"markdown",
+				"markdown_inline",
+				"python",
+				"query",
+				"regex",
+				"rust",
+				"toml",
+				"tsx",
+				"typescript",
+				"typst",
+				"vim",
+				"vimdoc",
+				"yaml",
+			},
+			highlight = {
+				enable = true,
+			},
+		},
+	},
 }

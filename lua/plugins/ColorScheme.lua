@@ -1,25 +1,3 @@
--- return {
--- 	{
--- 		"folke/tokyonight.nvim",
--- 		lazy = false,
--- 		priority = 1000,
--- 		opts = {
--- 			style = "day", -- "night", "storm", "moon", "day" から選択
--- 			transparent = true, -- 背景を透明にする
--- 			terminal_colors = true,
--- 			styles = {
--- 				comments = { italic = true },
--- 				keywords = { italic = false },
--- 				functions = { bold = true },
--- 				variables = {},
--- 			},
--- 		},
--- 		config = function(_, opts)
--- 			require("tokyonight").setup(opts)
--- 			vim.cmd.colorscheme("tokyonight")
--- 		end,
--- 	},
--- }
 return {
 	{
 		"catppuccin/nvim",
@@ -40,9 +18,11 @@ return {
 				variables = {},
 			},
 		},
-		config = function(_, opts)
-			require("catppuccin").setup(opts)
-			vim.cmd.colorscheme("catppuccin")
-		end,
+	},
+	{
+		"LazyVim/LazyVim",
+		opts = {
+			colorscheme = "catppuccin",
+		},
 	},
 }

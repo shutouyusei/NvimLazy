@@ -15,7 +15,6 @@ return {
 				"stylua",
 				"shellcheck",
 				"shfmt",
-				"flake8",
 				"clangd",
 				"codelldb",
 			},

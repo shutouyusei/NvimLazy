@@ -15,15 +15,10 @@ vim.opt.ambiwidth = "single"
 vim.opt.spell = true
 vim.opt.spelllang = { "en_us", "cjk" }
 
--- fold method
-vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
-vim.opt.foldtext = "v:lua.vim.treesitter.foldtext()"
+-- fold method (nvim-ufo drives folds; requires manual)
 vim.opt.foldmethod = "manual"
-vim.opt.foldlevel = 1
+vim.opt.foldlevelstart = 99
 
--- opcaity
+-- opacity
 vim.opt.winblend = 10
 vim.opt.pumblend = 10
-
--- terminal
-vim.env.TERM_PROGRAM = "WezTerm"

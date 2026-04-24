@@ -3,6 +3,40 @@ return {
 		"neovim/nvim-lspconfig",
 		opts = {
 			servers = {
+				harper_ls = {
+					filetypes = {
+						"c",
+						"cpp",
+						"cs",
+						"gitcommit",
+						"go",
+						"html",
+						"java",
+						"javascript",
+						"lua",
+						"nix",
+						"python",
+						"ruby",
+						"rust",
+						"swift",
+						"toml",
+						"typescript",
+						"typescriptreact",
+						"haskell",
+						"cmake",
+						"typst",
+						"php",
+						"dart",
+						"clojure",
+						"sh",
+					},
+					settings = {
+						["harper-ls"] = {
+							diagnosticSeverity = "hint",
+							userDictPath = vim.fn.expand("~/.config/harper-ls/dict.txt"),
+						},
+					},
+				},
 				-- ensure mason installs the server
 				clangd = {
 					keys = {

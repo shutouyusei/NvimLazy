@@ -1,13 +1,32 @@
 -- bootstrap lazy.nvim, LazyVim and your plugins
 require("config.lazy")
 
--- check update
+require("util.pdf_preview").setup()
+
+-- check for upstream config updates, at most once per 24h
 local function check_config_updates()
 	local config_dir = vim.fn.stdpath("config")
+	local stamp = vim.fn.stdpath("state") .. "/config-update-check"
+	local now = os.time()
+	local last = 0
+	local f = io.open(stamp, "r")
+	if f then
+		last = tonumber(f:read("*l") or "0") or 0
+		f:close()
+	end
+	if now - last < 24 * 60 * 60 then
+		return
+	end
 
 	vim.system({ "git", "-C", config_dir, "fetch" }, { text = true }, function(fetch_obj)
 		if fetch_obj.code ~= 0 then
 			return
+		end
+
+		local w = io.open(stamp, "w")
+		if w then
+			w:write(tostring(now))
+			w:close()
 		end
 
 		vim.system({ "git", "-C", config_dir, "rev-list", "HEAD..@{u}", "--count" }, { text = true }, function(check_obj)
