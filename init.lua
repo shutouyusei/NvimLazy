@@ -45,6 +45,55 @@ end
 
 check_config_updates()
 
+-- :ConfigDoctor — verify every external binary this config depends on.
+-- New-machine sanity check: run after install-deps.sh to see what (if anything) is missing.
+vim.api.nvim_create_user_command("ConfigDoctor", function()
+	local checks = {
+		{ name = "git", why = "vcs, LazyVim" },
+		{ name = "curl", why = "plugin downloads" },
+		{ name = "rg", why = "ripgrep — LazyVim grep, snacks picker" },
+		{ name = "fd", why = "fast file finder (fdfind symlinked)" },
+		{ name = "lazygit", why = "<leader>gg git UI" },
+		{ name = "node", why = "markdown-preview, some Mason tools" },
+		{ name = "npm", why = "Mason installs via npm for some LSPs" },
+		{ name = "rsvg-convert", why = "image.nvim SVG rendering" },
+		{ name = "pdftoppm", why = "latex pdf_preview util" },
+		{ name = "zathura", why = "vimtex PDF viewer" },
+		{ name = "harper-ls", why = "Mason-installed grammar LSP" },
+		{ name = "clangd", why = "Mason-installed C/C++ LSP" },
+		{ name = "stylua", why = "Mason-installed Lua formatter" },
+	}
+	local ok, missing = {}, {}
+	for _, c in ipairs(checks) do
+		local path = vim.fn.exepath(c.name)
+		if path ~= "" then
+			table.insert(ok, string.format("  ✅ %-16s %s", c.name, path))
+		else
+			table.insert(missing, string.format("  ❌ %-16s (%s)", c.name, c.why))
+		end
+	end
+	local lines = { "=== ConfigDoctor ===", "" }
+	vim.list_extend(lines, ok)
+	if #missing > 0 then
+		table.insert(lines, "")
+		table.insert(lines, "Missing:")
+		vim.list_extend(lines, missing)
+		table.insert(lines, "")
+		table.insert(lines, "Fix: re-run install-deps.sh or `:Mason` for Mason tools.")
+	end
+	local fonts = vim.fn.systemlist({ "fc-list", ":family" })
+	local has_nerd = false
+	for _, f in ipairs(fonts) do
+		if f:lower():match("nerd") then
+			has_nerd = true
+			break
+		end
+	end
+	table.insert(lines, "")
+	table.insert(lines, has_nerd and "  ✅ Nerd Font detected" or "  ❌ No Nerd Font found — icons will render as □")
+	vim.notify(table.concat(lines, "\n"), #missing > 0 and vim.log.levels.WARN or vim.log.levels.INFO, { title = "ConfigDoctor" })
+end, { desc = "Verify all external binaries this config depends on" })
+
 vim.api.nvim_create_user_command("ConfigPull", function()
 	local config_dir = vim.fn.stdpath("config")
 	vim.notify("更新を開始します...", vim.log.levels.INFO)

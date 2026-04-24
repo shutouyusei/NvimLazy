@@ -12,10 +12,21 @@ return {
 		},
 		opts = {
 			ensure_installed = {
+				-- formatters
 				"stylua",
-				"shellcheck",
 				"shfmt",
+				-- linters
+				"shellcheck",
+				"markdownlint-cli2",
+				-- language servers
+				"bash-language-server",
 				"clangd",
+				"harper-ls",
+				"json-lsp",
+				"lua-language-server",
+				"marksman",
+				"taplo",
+				-- debuggers
 				"codelldb",
 			},
 		},
