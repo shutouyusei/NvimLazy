@@ -16,7 +16,9 @@ end)
 describe("review_explain.cache read/write/merge", function()
   it("read returns an empty table when the file does not exist", function()
     local dir = tmp_dir()
-    assert.same({}, cache.read(dir .. "/nope.json"))
+    local got, decode_failed = cache.read(dir .. "/nope.json")
+    assert.same({}, got)
+    assert.is_false(decode_failed)
   end)
 
   it("write then read round-trips the data", function()
@@ -27,29 +29,142 @@ describe("review_explain.cache read/write/merge", function()
     assert.equal("does a thing", got.foo.explanation)
   end)
 
-  it("merge adds new entries with body_hash and generated_at, keyed by name", function()
+  it("read signals decode_failed on a corrupt file instead of silently returning {}", function()
+    local dir = tmp_dir()
+    local path = dir .. "/corrupt.json"
+    local f = assert(io.open(path, "w"))
+    f:write("<<<<<<< HEAD\n{\"foo\": 1}\n=======\n{\"foo\": 2}\n>>>>>>> branch\n")
+    f:close()
+    local got, decode_failed = cache.read(path)
+    assert.same({}, got)
+    assert.is_true(decode_failed)
+  end)
+
+  it("merge adds new entries as a single-element revision list, most recent first", function()
     local dir = tmp_dir()
     local path = dir .. "/foo.lua.json"
     local entries = {
       { name = "foo", start_line = 1, end_line = 3, explanation = "does a thing" },
     }
     local result = cache.merge(path, entries, { foo = "abc123" })
-    assert.equal(1, result.foo.start_line)
-    assert.equal(3, result.foo.end_line)
-    assert.equal("abc123", result.foo.body_hash)
-    assert.equal("does a thing", result.foo.explanation)
-    assert.is_string(result.foo.generated_at)
+    assert.equal(1, #result.foo)
+    assert.equal(1, result.foo[1].start_line)
+    assert.equal(3, result.foo[1].end_line)
+    assert.equal("abc123", result.foo[1].body_hash)
+    assert.equal("does a thing", result.foo[1].explanation)
+    assert.is_string(result.foo[1].generated_at)
   end)
 
   it("merge preserves existing entries not touched by this call", function()
     local dir = tmp_dir()
     local path = dir .. "/foo.lua.json"
-    cache.write(path, { bar = { explanation = "old" } })
+    cache.write(path, { bar = { { explanation = "old", body_hash = "b1" } } })
     cache.merge(path, {
       { name = "foo", start_line = 1, end_line = 2, explanation = "new" },
     }, { foo = "h" })
     local got = cache.read(path)
-    assert.equal("old", got.bar.explanation)
-    assert.equal("new", got.foo.explanation)
+    assert.equal("old", got.bar[1].explanation)
+    assert.equal("new", got.foo[1].explanation)
+  end)
+
+  it("merge prepends a new revision when the same name gets a different body_hash", function()
+    local dir = tmp_dir()
+    local path = dir .. "/foo.lua.json"
+    cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 2, explanation = "v1" },
+    }, { foo = "hash1" })
+    local result = cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 3, explanation = "v2" },
+    }, { foo = "hash2" })
+    assert.equal(2, #result.foo)
+    assert.equal("v2", result.foo[1].explanation)
+    assert.equal("hash2", result.foo[1].body_hash)
+    assert.equal("v1", result.foo[2].explanation)
+    assert.equal("hash1", result.foo[2].body_hash)
+  end)
+
+  it("merge does not duplicate a revision when the same body_hash reappears", function()
+    local dir = tmp_dir()
+    local path = dir .. "/foo.lua.json"
+    cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 2, explanation = "v1" },
+    }, { foo = "hash1" })
+    local result = cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 2, explanation = "v1-regenerated" },
+    }, { foo = "hash1" })
+    assert.equal(1, #result.foo)
+    assert.equal("v1-regenerated", result.foo[1].explanation)
+  end)
+
+  it("write backs up a previously-corrupt file to <path>.bak before overwriting", function()
+    local dir = tmp_dir()
+    local path = dir .. "/foo.lua.json"
+    local corrupt_content = "<<<<<<< HEAD\nnot json\n"
+    local f = assert(io.open(path, "w"))
+    f:write(corrupt_content)
+    f:close()
+
+    cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 2, explanation = "new" },
+    }, { foo = "h" })
+
+    local bak = assert(io.open(path .. ".bak", "r"))
+    local bak_content = bak:read("*a")
+    bak:close()
+    assert.equal(corrupt_content, bak_content)
+
+    -- and the real path now holds valid, decodable JSON
+    local got = cache.read(path)
+    assert.equal("new", got.foo[1].explanation)
+  end)
+
+  it("produces output with a stable, sorted top-level key order regardless of merge order", function()
+    local dir_a = tmp_dir()
+    local path_a = dir_a .. "/foo.lua.json"
+    cache.merge(path_a, {
+      { name = "zeta", start_line = 1, end_line = 2, explanation = "z" },
+    }, { zeta = "hz" })
+    cache.merge(path_a, {
+      { name = "alpha", start_line = 3, end_line = 4, explanation = "a" },
+    }, { alpha = "ha" })
+
+    local dir_b = tmp_dir()
+    local path_b = dir_b .. "/foo.lua.json"
+    cache.merge(path_b, {
+      { name = "alpha", start_line = 3, end_line = 4, explanation = "a" },
+    }, { alpha = "ha" })
+    cache.merge(path_b, {
+      { name = "zeta", start_line = 1, end_line = 2, explanation = "z" },
+    }, { zeta = "hz" })
+
+    local function read_raw(path)
+      local f = assert(io.open(path, "r"))
+      local content = f:read("*a")
+      f:close()
+      -- generated_at timestamps will differ by call order in real time but
+      -- are the same across these two runs since they execute back-to-back
+      -- within the same second in practice; strip them to avoid flakiness.
+      return (content:gsub('"generated_at": "[^"]*"', '"generated_at": "STRIPPED"'))
+    end
+
+    assert.equal(read_raw(path_a), read_raw(path_b))
+
+    local raw = read_raw(path_a)
+    local alpha_pos = raw:find('"alpha"')
+    local zeta_pos = raw:find('"zeta"')
+    assert.is_true(alpha_pos < zeta_pos)
+  end)
+
+  it("write output is multi-line (not a single-line blob)", function()
+    local dir = tmp_dir()
+    local path = dir .. "/foo.lua.json"
+    cache.merge(path, {
+      { name = "foo", start_line = 1, end_line = 2, explanation = "x" },
+    }, { foo = "h" })
+    local f = assert(io.open(path, "r"))
+    local content = f:read("*a")
+    f:close()
+    local _, newline_count = content:gsub("\n", "\n")
+    assert.is_true(newline_count > 1)
   end)
 end)
