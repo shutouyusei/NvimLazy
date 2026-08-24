@@ -13,10 +13,17 @@ return {
 			generate.run(0, start_lnum, end_lnum)
 		end, { desc = "Explain selection with Claude" })
 
-		vim.keymap.set("n", "K", function()
-			if not recall.show(0) then
-				vim.lsp.buf.hover()
-			end
-		end, { desc = "Hover / cached explanation" })
+		vim.api.nvim_create_autocmd("LspAttach", {
+			group = vim.api.nvim_create_augroup("review_explain_lsp_attach", { clear = true }),
+			callback = function(args)
+				vim.keymap.set("n", "K", function()
+					if not recall.show(0) then
+						if #vim.lsp.get_clients({ bufnr = args.buf }) > 0 then
+							vim.lsp.buf.hover()
+						end
+					end
+				end, { buffer = args.buf, desc = "Hover / cached explanation" })
+			end,
+		})
 	end,
 }
