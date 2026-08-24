@@ -100,16 +100,10 @@ function M.show(bufnr)
 end
 
 ---Mark a range [start_row, end_row] (0-indexed, inclusive) as a bounded
----region: a top/bottom border drawn as `virt_lines` (whole synthetic lines
----inserted before/after the range, never touching an existing line's own
----content) plus a background tint on each line's actual text only -- no
----end-of-line padding. Padding to a uniform right edge previously used
----eol-positioned virt_text, which collided with LSP inlay hints (also
----eol-positioned virt_text on the same line): multiple eol virt_texts on
----one line don't reliably coexist, so the hint would vanish or the
----padding would swallow it depending on priority. virt_lines are a
----separate line, so this has no such interaction, at the cost of a
----ragged (not perfectly flush) right edge on the body.
+---region with a top/bottom border drawn as `virt_lines` -- whole synthetic
+---lines inserted before/after the range, never touching an existing
+---line's own content, so this has no interaction with LSP inlay hints
+---(which insert eol/inline virt_text into the real lines themselves).
 ---@param bufnr integer
 ---@param ns integer
 ---@param start_row integer
@@ -131,19 +125,6 @@ local function highlight_box(bufnr, ns, start_row, end_row, hl_group)
 	vim.api.nvim_buf_set_extmark(bufnr, ns, end_row, 0, {
 		virt_lines = { { { "╰" .. string.rep("─", max_width) .. "╯", hl_group } } },
 	})
-
-	for i, line in ipairs(lines) do
-		local row = start_row + i - 1
-		local byte_len = #line
-		if byte_len > 0 then
-			vim.api.nvim_buf_set_extmark(bufnr, ns, row, 0, {
-				end_col = byte_len,
-				hl_group = hl_group,
-				hl_mode = "blend",
-				priority = 100,
-			})
-		end
-	end
 end
 
 ---Highlight every function in the buffer that has a cached explanation,
