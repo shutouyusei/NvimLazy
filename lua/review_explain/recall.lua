@@ -19,16 +19,23 @@ function M.show(bufnr)
 	if filepath == "" then
 		return false
 	end
-	local cwd = vim.fn.getcwd()
-	local cache_path = cache.cache_path(cwd .. "/" .. generate.config.cache_dirname, filepath, cwd)
+	local root = vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd()
+	local cache_path = cache.cache_path(root .. "/" .. generate.config.cache_dirname, filepath, root)
 	local entries = cache.read(cache_path)
-	local entry = entries[found.name]
-	if not entry then
+	local revisions = entries[found.name]
+	if not revisions then
 		return false
 	end
 
 	local current_hash = resolve.hash_node(bufnr, found.node)
-	if entry.body_hash ~= current_hash then
+	local entry = nil
+	for _, revision in ipairs(revisions) do
+		if revision.body_hash == current_hash then
+			entry = revision
+			break
+		end
+	end
+	if not entry then
 		return false
 	end
 
