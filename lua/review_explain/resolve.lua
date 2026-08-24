@@ -138,7 +138,21 @@ function M.find_enclosing_function(bufnr, lnum)
 	end
 	local root = tree:root()
 
-	local node = root:named_descendant_for_range(lnum, 0, lnum, 0)
+	-- Probe at the first non-blank column of the line rather than column 0:
+	-- on an indented line (e.g. a method inside a class, a function nested in
+	-- a do/if block) column 0 is whitespace, outside the function node, so
+	-- resolution would otherwise fail on the function's own signature line --
+	-- exactly the line the LLM usually reports as start_line.
+	local col = 0
+	local line_text = vim.api.nvim_buf_get_lines(bufnr, lnum, lnum + 1, false)[1]
+	if line_text then
+		local first_non_blank = line_text:find("%S")
+		if first_non_blank then
+			col = first_non_blank - 1
+		end
+	end
+
+	local node = root:named_descendant_for_range(lnum, col, lnum, col)
 	while node do
 		if FUNCTION_NODE_TYPES[node:type()] then
 			local name = node_name(bufnr, node)

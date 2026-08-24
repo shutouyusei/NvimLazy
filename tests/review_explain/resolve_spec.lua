@@ -90,6 +90,23 @@ describe("review_explain.resolve.find_enclosing_function", function()
     assert.is_nil(found)
   end)
 
+  it("resolves an indented function signature line (e.g. nested inside a do block)", function()
+    local bufnr = make_lua_buffer({
+      "do",
+      "  local function indented_helper(x)",
+      "    return x + 1",
+      "  end",
+      "end",
+    })
+    -- lnum 1 is the indented function signature line itself, probed at column 0
+    -- would land on whitespace outside the function node.
+    local found = resolve.find_enclosing_function(bufnr, 1)
+    assert.is_table(found)
+    assert.equal("indented_helper", found.name)
+    assert.equal(2, found.start_line)
+    assert.equal(4, found.end_line)
+  end)
+
   it("returns nil when the line is outside any function", function()
     local bufnr = make_lua_buffer({
       "local x = 1",
