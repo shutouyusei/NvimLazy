@@ -136,13 +136,7 @@ local function highlight_box(bufnr, ns, start_row, end_row, hl_group)
 			vim.api.nvim_buf_set_extmark(bufnr, ns, row, byte_len, {
 				virt_text = { { string.rep(" ", pad), hl_group } },
 				virt_text_pos = "eol",
-				-- LSP inlay hints are also eol-positioned virt_text, at
-				-- Neovim's default priority (4096). Multiple eol virt_texts
-				-- on one line concatenate in priority order; a higher
-				-- priority here pushes our padding after the hint instead
-				-- of before it, so the hint sits inside the box rather than
-				-- trailing uncolored off the end of it.
-				priority = 5000,
+				priority = 100,
 			})
 		end
 	end
