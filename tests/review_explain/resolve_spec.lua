@@ -116,6 +116,49 @@ describe("review_explain.resolve.find_enclosing_function", function()
   end)
 end)
 
+describe("review_explain.resolve.find_all_functions", function()
+  it("finds every top-level function in the buffer", function()
+    local bufnr = make_lua_buffer({
+      "local function foo()",
+      "  return 1",
+      "end",
+      "",
+      "function M.bar()",
+      "  return 2",
+      "end",
+    })
+    local found = resolve.find_all_functions(bufnr)
+    local names = {}
+    for _, f in ipairs(found) do
+      table.insert(names, f.name)
+    end
+    table.sort(names)
+    assert.same({ "bar", "foo" }, names)
+  end)
+
+  it("also finds nested functions, not just top-level ones", function()
+    local bufnr = make_lua_buffer({
+      "local function outer()",
+      "  M.inner = function()",
+      "    return 1",
+      "  end",
+      "end",
+    })
+    local found = resolve.find_all_functions(bufnr)
+    local names = {}
+    for _, f in ipairs(found) do
+      table.insert(names, f.name)
+    end
+    table.sort(names)
+    assert.same({ "inner", "outer" }, names)
+  end)
+
+  it("returns an empty list when there are no functions", function()
+    local bufnr = make_lua_buffer({ "local x = 1" })
+    assert.same({}, resolve.find_all_functions(bufnr))
+  end)
+end)
+
 describe("review_explain.resolve.hash_node", function()
   it("produces the same hash for identical function bodies", function()
     local buf_a = make_lua_buffer({ "local function f()", "  return 1", "end" })

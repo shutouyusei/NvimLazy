@@ -166,6 +166,39 @@ function M.find_enclosing_function(bufnr, lnum)
 	return nil
 end
 
+---Find every function-like node in the buffer, each with its resolved name.
+---Used to scan a whole buffer (e.g. for highlighting explained functions),
+---as opposed to find_enclosing_function's single-position lookup.
+---@param bufnr integer
+---@return {name:string, start_line:integer, end_line:integer, node:userdata}[]
+function M.find_all_functions(bufnr)
+	local ok, parser = pcall(vim.treesitter.get_parser, bufnr)
+	if not ok or not parser then
+		return {}
+	end
+	local tree = parser:parse()[1]
+	if not tree then
+		return {}
+	end
+
+	local results = {}
+	local function walk(node)
+		if FUNCTION_NODE_TYPES[node:type()] then
+			local name = node_name(bufnr, node)
+			if name then
+				local srow, _, erow, _ = node:range()
+				table.insert(results, { name = name, start_line = srow + 1, end_line = erow + 1, node = node })
+			end
+		end
+		for child in node:iter_children() do
+			walk(child)
+		end
+	end
+	walk(tree:root())
+
+	return results
+end
+
 ---@param bufnr integer
 ---@param node userdata
 ---@return string sha256 hex digest of the node's source text

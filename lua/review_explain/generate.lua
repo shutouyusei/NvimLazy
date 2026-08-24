@@ -3,13 +3,9 @@ local client = require("review_explain.client")
 local parser = require("review_explain.parser")
 local resolve = require("review_explain.resolve")
 local cache = require("review_explain.cache")
+local config = require("review_explain.config")
 
 local M = {}
-
-M.config = {
-	model = nil,
-	cache_dirname = ".nvim-review",
-}
 
 local ns = vim.api.nvim_create_namespace("review_explain")
 
@@ -44,7 +40,7 @@ function M.run(bufnr, start_lnum, end_lnum)
 	client.run({
 		system_prompt = prompt.SYSTEM_PROMPT,
 		user_message = prompt.build_user_message(code, filepath, filetype),
-		model = M.config.model,
+		model = config.model,
 	}, function(ok, stdout_or_err)
 		in_flight[bufnr] = nil
 
@@ -131,8 +127,9 @@ function M.run(bufnr, start_lnum, end_lnum)
 		end
 
 		local root = cache.resolve_root(bufnr)
-		local cache_path = cache.cache_path(root .. "/" .. M.config.cache_dirname, filepath, root)
+		local cache_path = cache.cache_path(root .. "/" .. config.cache_dirname, filepath, root)
 		cache.merge(cache_path, resolved_entries, body_hashes)
+		require("review_explain.recall").highlight_buffer(bufnr)
 
 		vim.notify(
 			string.format("review-explain: explained %d function(s)", #resolved_entries),

@@ -1,9 +1,19 @@
 local resolve = require("review_explain.resolve")
 local cache = require("review_explain.cache")
 local display = require("review_explain.display")
-local generate = require("review_explain.generate")
+local config = require("review_explain.config")
 
 local M = {}
+
+local highlight_ns = vim.api.nvim_create_namespace("review_explain_highlight")
+
+---@param bufnr integer
+---@return string cache_path
+local function cache_path_for_buffer(bufnr)
+	local filepath = vim.api.nvim_buf_get_name(bufnr)
+	local root = cache.resolve_root(bufnr)
+	return cache.cache_path(root .. "/" .. config.cache_dirname, filepath, root)
+end
 
 ---Look up the cached explanation for the function under the cursor, if any.
 ---@param bufnr integer
@@ -19,9 +29,7 @@ local function find_cached_explanation(bufnr)
 	if filepath == "" then
 		return nil
 	end
-	local root = cache.resolve_root(bufnr)
-	local cache_path = cache.cache_path(root .. "/" .. generate.config.cache_dirname, filepath, root)
-	local entries = cache.read(cache_path)
+	local entries = cache.read(cache_path_for_buffer(bufnr))
 	local revisions = entries[found.name]
 	if not revisions then
 		return nil
@@ -85,6 +93,41 @@ function M.show(bufnr)
 
 		display.show(lines)
 	end)
+end
+
+---Highlight every function in the buffer that has a cached explanation
+---matching its current content (body_hash), so explained functions are
+---visible at a glance without pressing K on each one.
+---@param bufnr integer
+function M.highlight_buffer(bufnr)
+	vim.api.nvim_buf_clear_namespace(bufnr, highlight_ns, 0, -1)
+
+	if vim.api.nvim_buf_get_name(bufnr) == "" then
+		return
+	end
+
+	local entries = cache.read(cache_path_for_buffer(bufnr))
+	if vim.tbl_isempty(entries) then
+		return
+	end
+
+	for _, fn in ipairs(resolve.find_all_functions(bufnr)) do
+		local revisions = entries[fn.name]
+		if revisions then
+			local current_hash = resolve.hash_node(bufnr, fn.node)
+			for _, revision in ipairs(revisions) do
+				if revision.body_hash == current_hash then
+					vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, fn.start_line - 1, 0, {
+						end_row = fn.end_line - 1,
+						hl_group = "ReviewExplainExplained",
+						hl_eol = true,
+						priority = 100,
+					})
+					break
+				end
+			end
+		end
+	end
 end
 
 return M

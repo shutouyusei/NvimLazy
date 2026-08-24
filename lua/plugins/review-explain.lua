@@ -5,6 +5,12 @@ return {
 	config = function()
 		local generate = require("review_explain.generate")
 
+		-- Background for functions that already have an explanation matching
+		-- their current content, so they're visible without pressing K on
+		-- each one. Linked (not hardcoded) so it follows the colorscheme;
+		-- `default = true` lets a user override it in their own config.
+		vim.api.nvim_set_hl(0, "ReviewExplainExplained", { link = "Folded", default = true })
+
 		vim.keymap.set("x", "<leader>ce", function()
 			vim.cmd("normal! \27") -- exit visual mode so '< '> marks are set
 			local start_lnum = vim.api.nvim_buf_get_mark(0, "<")[1] - 1
@@ -50,6 +56,8 @@ return {
 				vim.keymap.set("n", "K", function()
 					require("review_explain.recall").show(args.buf)
 				end, { buffer = args.buf, desc = "Hover / cached explanation" })
+
+				require("review_explain.recall").highlight_buffer(args.buf)
 			end,
 		})
 	end,
