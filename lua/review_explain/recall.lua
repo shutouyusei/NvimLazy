@@ -99,12 +99,17 @@ function M.show(bufnr)
 	end)
 end
 
----Color a rectangular box over [start_row, end_row] (0-indexed, inclusive)
----sized to the widest line in that range, rather than the full window
----width: `hl_eol` highlights to the edge of the window, which looks like a
----full-width band rather than a box fitted to the code. Shorter lines get
----virtual-text padding in the same color so every row's right edge lines
----up with the widest one.
+---Mark a range [start_row, end_row] (0-indexed, inclusive) as a bounded
+---region: a top/bottom border drawn as `virt_lines` (whole synthetic lines
+---inserted before/after the range, never touching an existing line's own
+---content) plus a background tint on each line's actual text only -- no
+---end-of-line padding. Padding to a uniform right edge previously used
+---eol-positioned virt_text, which collided with LSP inlay hints (also
+---eol-positioned virt_text on the same line): multiple eol virt_texts on
+---one line don't reliably coexist, so the hint would vanish or the
+---padding would swallow it depending on priority. virt_lines are a
+---separate line, so this has no such interaction, at the cost of a
+---ragged (not perfectly flush) right edge on the body.
 ---@param bufnr integer
 ---@param ns integer
 ---@param start_row integer
@@ -117,25 +122,24 @@ local function highlight_box(bufnr, ns, start_row, end_row, hl_group)
 	for _, line in ipairs(lines) do
 		max_width = math.max(max_width, vim.fn.strdisplaywidth(line))
 	end
+	max_width = math.max(max_width, 1)
+
+	vim.api.nvim_buf_set_extmark(bufnr, ns, start_row, 0, {
+		virt_lines = { { { "╭" .. string.rep("─", max_width) .. "╮", hl_group } } },
+		virt_lines_above = true,
+	})
+	vim.api.nvim_buf_set_extmark(bufnr, ns, end_row, 0, {
+		virt_lines = { { { "╰" .. string.rep("─", max_width) .. "╯", hl_group } } },
+	})
 
 	for i, line in ipairs(lines) do
 		local row = start_row + i - 1
 		local byte_len = #line
-
 		if byte_len > 0 then
 			vim.api.nvim_buf_set_extmark(bufnr, ns, row, 0, {
 				end_col = byte_len,
 				hl_group = hl_group,
 				hl_mode = "blend",
-				priority = 100,
-			})
-		end
-
-		local pad = max_width - vim.fn.strdisplaywidth(line)
-		if pad > 0 then
-			vim.api.nvim_buf_set_extmark(bufnr, ns, row, byte_len, {
-				virt_text = { { string.rep(" ", pad), hl_group } },
-				virt_text_pos = "eol",
 				priority = 100,
 			})
 		end
@@ -168,7 +172,10 @@ function M.highlight_buffer(bufnr)
 			highlight_box(bufnr, highlight_ns, fn.start_line - 1, fn.end_line - 1, box_group)
 			for row = fn.start_line - 1, fn.end_line - 1 do
 				vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, row, 0, {
-					sign_text = "▎",
+					-- Not a vertical bar: hlchunk's indent guides already use
+					-- that shape, and using it here too would read as the
+					-- same kind of marker.
+					sign_text = "●",
 					sign_hl_group = sign_group,
 				})
 			end
