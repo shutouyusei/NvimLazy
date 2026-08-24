@@ -15,33 +15,31 @@ local function cache_path_for_buffer(bufnr)
 	return cache.cache_path(root .. "/" .. config.cache_dirname, filepath, root)
 end
 
----Look up the cached explanation for the function under the cursor, if any.
+---Look up the best available cached explanation for a resolved function:
+---the revision matching its current content if one exists, otherwise the
+---most recent revision on record (marked stale) so an explanation stays
+---available -- and visibly flagged as possibly outdated -- instead of
+---disappearing the moment the function is edited.
 ---@param bufnr integer
----@return string|nil explanation
-local function find_cached_explanation(bufnr)
-	local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
-	local found = resolve.find_enclosing_function(bufnr, lnum)
-	if not found then
-		return nil
-	end
-
-	local filepath = vim.api.nvim_buf_get_name(bufnr)
-	if filepath == "" then
-		return nil
-	end
+---@param found {name:string, node:userdata}
+---@return {explanation:string, stale:boolean}|nil
+local function find_best_revision(bufnr, found)
 	local entries = cache.read(cache_path_for_buffer(bufnr))
 	local revisions = entries[found.name]
-	if not revisions then
+	if not revisions or #revisions == 0 then
 		return nil
 	end
 
 	local current_hash = resolve.hash_node(bufnr, found.node)
 	for _, revision in ipairs(revisions) do
 		if revision.body_hash == current_hash then
-			return revision.explanation
+			return { explanation = revision.explanation, stale = false }
 		end
 	end
-	return nil
+
+	-- No exact match: revisions are stored most-recent-first (cache.merge),
+	-- so [1] is the closest thing we have.
+	return { explanation = revisions[1].explanation, stale = true }
 end
 
 ---Request LSP hover for the cursor position and return its markdown lines.
@@ -72,18 +70,24 @@ end
 ---other.
 ---@param bufnr integer
 function M.show(bufnr)
-	local explanation = find_cached_explanation(bufnr)
+	local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
+	local found = resolve.find_enclosing_function(bufnr, lnum)
+	local best = found and find_best_revision(bufnr, found) or nil
 
 	request_hover(bufnr, function(hover_lines)
 		local lines = {}
 		vim.list_extend(lines, hover_lines)
 
-		if explanation then
+		if best then
 			if #lines > 0 then
 				table.insert(lines, "---")
 			end
-			table.insert(lines, "**AI explanation:**")
-			vim.list_extend(lines, vim.split(explanation, "\n"))
+			if best.stale then
+				table.insert(lines, "**AI explanation (⚠️ code changed since this was written):**")
+			else
+				table.insert(lines, "**AI explanation:**")
+			end
+			vim.list_extend(lines, vim.split(best.explanation, "\n"))
 		end
 
 		if #lines == 0 then
@@ -95,9 +99,11 @@ function M.show(bufnr)
 	end)
 end
 
----Highlight every function in the buffer that has a cached explanation
----matching its current content (body_hash), so explained functions are
----visible at a glance without pressing K on each one.
+---Highlight every function in the buffer that has a cached explanation,
+---so explained functions are visible at a glance without pressing K on
+---each one. Functions whose content matches the cached revision exactly
+---get one color; functions whose content has since changed (a stale
+---revision is all that's on record) get a different one.
 ---@param bufnr integer
 function M.highlight_buffer(bufnr)
 	vim.api.nvim_buf_clear_namespace(bufnr, highlight_ns, 0, -1)
@@ -112,24 +118,23 @@ function M.highlight_buffer(bufnr)
 	end
 
 	for _, fn in ipairs(resolve.find_all_functions(bufnr)) do
-		local revisions = entries[fn.name]
-		if revisions then
-			local current_hash = resolve.hash_node(bufnr, fn.node)
-			for _, revision in ipairs(revisions) do
-				if revision.body_hash == current_hash then
-					-- A sign-column marker rather than a background highlight:
-					-- background-based highlighting is invisible under a
-					-- transparent-background colorscheme (many "linkable"
-					-- groups like Folded carry no bg in that case), while a
-					-- colored sign glyph is unaffected by that.
-					for row = fn.start_line - 1, fn.end_line - 1 do
-						vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, row, 0, {
-							sign_text = "▎",
-							sign_hl_group = "ReviewExplainExplained",
-						})
-					end
-					break
-				end
+		local best = find_best_revision(bufnr, fn)
+		if best then
+			local box_group = best.stale and "ReviewExplainStale" or "ReviewExplainExplained"
+			local sign_group = best.stale and "ReviewExplainStaleSign" or "ReviewExplainExplainedSign"
+			vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, fn.start_line - 1, 0, {
+				end_row = fn.end_line - 1,
+				end_col = 0,
+				hl_group = box_group,
+				hl_eol = true,
+				hl_mode = "blend",
+				priority = 100,
+			})
+			for row = fn.start_line - 1, fn.end_line - 1 do
+				vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, row, 0, {
+					sign_text = "▎",
+					sign_hl_group = sign_group,
+				})
 			end
 		end
 	end

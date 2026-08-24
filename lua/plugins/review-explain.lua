@@ -5,16 +5,35 @@ return {
 	config = function()
 		local generate = require("review_explain.generate")
 
-		-- Sign-column marker for functions that already have an explanation
-		-- matching their current content, so they're visible without
-		-- pressing K on each one. Linked (not hardcoded) so it follows the
-		-- colorscheme; `default = true` lets a user override it. Uses a
-		-- sign glyph rather than a background highlight: several linkable
-		-- groups (e.g. Folded) carry no `bg` at all under a
-		-- transparent-background colorscheme, which would make a
-		-- background-based highlight invisible; a sign glyph only needs
-		-- `fg`, which DiagnosticHint reliably has.
-		vim.api.nvim_set_hl(0, "ReviewExplainExplained", { link = "DiagnosticHint", default = true })
+		-- Explained-function markers: a colored sign-column bar plus a
+		-- colored block over the whole function body. Colors are set
+		-- directly (not `link`ed to another group) so they're guaranteed
+		-- visible regardless of colorscheme -- several linkable groups
+		-- (e.g. Folded) carry no `bg` at all under a transparent-background
+		-- setup, which silently makes a background highlight invisible.
+		-- Blue-ish = matches current content; orange-ish = stale (a past
+		-- revision exists but the function has since changed).
+		-- Box groups set `bg` only, so the underlying syntax highlighting's
+		-- own text color still shows through. Sign groups set `fg` only --
+		-- sign-column glyphs have no separate syntax color to combine with.
+		local function apply_review_explain_highlights()
+			if vim.o.background == "light" then
+				vim.api.nvim_set_hl(0, "ReviewExplainExplained", { bg = "#cfe0ff" })
+				vim.api.nvim_set_hl(0, "ReviewExplainStale", { bg = "#ffe3b3" })
+				vim.api.nvim_set_hl(0, "ReviewExplainExplainedSign", { fg = "#1a3a6b" })
+				vim.api.nvim_set_hl(0, "ReviewExplainStaleSign", { fg = "#6b4a1a" })
+			else
+				vim.api.nvim_set_hl(0, "ReviewExplainExplained", { bg = "#2d3f6b" })
+				vim.api.nvim_set_hl(0, "ReviewExplainStale", { bg = "#6b4a1a" })
+				vim.api.nvim_set_hl(0, "ReviewExplainExplainedSign", { fg = "#bcd4ff" })
+				vim.api.nvim_set_hl(0, "ReviewExplainStaleSign", { fg = "#ffd699" })
+			end
+		end
+		apply_review_explain_highlights()
+		vim.api.nvim_create_autocmd("ColorScheme", {
+			group = vim.api.nvim_create_augroup("review_explain_colors", { clear = true }),
+			callback = apply_review_explain_highlights,
+		})
 
 		vim.keymap.set("x", "<leader>ce", function()
 			vim.cmd("normal! \27") -- exit visual mode so '< '> marks are set
