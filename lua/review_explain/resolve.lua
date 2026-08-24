@@ -29,11 +29,38 @@ local function extract_index_name(bufnr, expr_node)
 	return rightmost_id
 end
 
+---Check if a function node is the direct RHS value of an assignment (not nested inside a table/other expr).
+---@param func_node userdata the function_definition node
+---@param assign_node userdata the assignment_statement node
+---@return boolean true if func_node is directly the RHS of assign_node
+local function is_direct_rhs_of_assignment(func_node, assign_node)
+	-- Walk up from func_node to find if we hit assign_node with expression_list as the only intermediate
+	local current = func_node:parent()
+
+	-- Direct case: func_definition -> expression_list -> assignment_statement
+	if current and current:type() == "expression_list" then
+		local grandparent = current:parent()
+		if grandparent == assign_node then
+			return true
+		end
+	end
+
+	-- If we hit a table constructor, field, or other expression before reaching assignment, it's not direct
+	return false
+end
+
 ---Extract the function name from an assignment LHS (e.g., M.foo in "M.foo = function() end").
+---Only applies if the function is the direct RHS value, not nested in table/other structures.
 ---@param bufnr integer
 ---@param assign_node userdata
+---@param func_node userdata the function_definition node being checked
 ---@return string|nil
-local function extract_assignment_name(bufnr, assign_node)
+local function extract_assignment_name(bufnr, assign_node, func_node)
+	-- Only extract the assignment name if the function is the *direct* RHS value
+	if not is_direct_rhs_of_assignment(func_node, assign_node) then
+		return nil
+	end
+
 	-- The assignment statement has children: (variable_list, "=", expression_list)
 	-- The variable_list contains the LHS; we want the rightmost identifier in it
 	local var_list = nil
@@ -84,11 +111,11 @@ local function node_name(bufnr, node)
 
 	-- If the function node has no name-bearing child, check if an ancestor is an assignment_statement
 	-- (for "M.foo = function()" style). The function_definition is inside expression_list which is
-	-- inside assignment_statement.
+	-- inside assignment_statement. Only extract the assignment name if the function is the direct RHS.
 	local parent = node:parent()
 	while parent do
 		if parent:type() == "assignment_statement" then
-			return extract_assignment_name(bufnr, parent)
+			return extract_assignment_name(bufnr, parent, node)
 		end
 		parent = parent:parent()
 	end

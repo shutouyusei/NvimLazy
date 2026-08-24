@@ -65,11 +65,29 @@ describe("review_explain.resolve.find_enclosing_function", function()
       "  end",
       "end",
     })
-    -- lnum 2 is the line with "M.inner = function()"
+    -- lnum 2 is inside the inner function body (the "local y = 42" line)
     local found = resolve.find_enclosing_function(bufnr, 2)
     assert.is_table(found)
     assert.equal("inner", found.name)
     assert.is_not.equal("outer", found.name)
+  end)
+
+  it("does not misattribute functions nested in table constructors", function()
+    local bufnr = make_lua_buffer({
+      "M.handlers = {",
+      "  onClick = function()",
+      "    local x = 1",
+      "  end,",
+      "}",
+    })
+    -- lnum 2 is inside the onClick function body
+    local found = resolve.find_enclosing_function(bufnr, 2)
+    -- The function is nested inside a table, not directly assigned, so should not be "handlers"
+    if found then
+      assert.is_not.equal("handlers", found.name)
+    end
+    -- If found, it should be nil since the function has no direct name (anonymous in table)
+    assert.is_nil(found)
   end)
 
   it("returns nil when the line is outside any function", function()
