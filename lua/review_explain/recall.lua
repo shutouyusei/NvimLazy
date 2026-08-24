@@ -117,12 +117,17 @@ function M.highlight_buffer(bufnr)
 			local current_hash = resolve.hash_node(bufnr, fn.node)
 			for _, revision in ipairs(revisions) do
 				if revision.body_hash == current_hash then
-					vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, fn.start_line - 1, 0, {
-						end_row = fn.end_line - 1,
-						hl_group = "ReviewExplainExplained",
-						hl_eol = true,
-						priority = 100,
-					})
+					-- A sign-column marker rather than a background highlight:
+					-- background-based highlighting is invisible under a
+					-- transparent-background colorscheme (many "linkable"
+					-- groups like Folded carry no bg in that case), while a
+					-- colored sign glyph is unaffected by that.
+					for row = fn.start_line - 1, fn.end_line - 1 do
+						vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, row, 0, {
+							sign_text = "▎",
+							sign_hl_group = "ReviewExplainExplained",
+						})
+					end
 					break
 				end
 			end

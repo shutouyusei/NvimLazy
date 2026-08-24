@@ -5,11 +5,16 @@ return {
 	config = function()
 		local generate = require("review_explain.generate")
 
-		-- Background for functions that already have an explanation matching
-		-- their current content, so they're visible without pressing K on
-		-- each one. Linked (not hardcoded) so it follows the colorscheme;
-		-- `default = true` lets a user override it in their own config.
-		vim.api.nvim_set_hl(0, "ReviewExplainExplained", { link = "Folded", default = true })
+		-- Sign-column marker for functions that already have an explanation
+		-- matching their current content, so they're visible without
+		-- pressing K on each one. Linked (not hardcoded) so it follows the
+		-- colorscheme; `default = true` lets a user override it. Uses a
+		-- sign glyph rather than a background highlight: several linkable
+		-- groups (e.g. Folded) carry no `bg` at all under a
+		-- transparent-background colorscheme, which would make a
+		-- background-based highlight invisible; a sign glyph only needs
+		-- `fg`, which DiagnosticHint reliably has.
+		vim.api.nvim_set_hl(0, "ReviewExplainExplained", { link = "DiagnosticHint", default = true })
 
 		vim.keymap.set("x", "<leader>ce", function()
 			vim.cmd("normal! \27") -- exit visual mode so '< '> marks are set
