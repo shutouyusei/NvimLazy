@@ -50,24 +50,42 @@ function M.run(bufnr, start_lnum, end_lnum)
 		end
 
 		local body_hashes = {}
+		local resolved_entries = {}
 		for _, entry in ipairs(entries) do
 			-- entry.start_line is 1-indexed relative to the selection; translate
 			-- to an absolute 0-indexed buffer line to search from.
 			local abs_lnum = start_lnum + entry.start_line - 1
 			local found = resolve.find_enclosing_function(bufnr, abs_lnum)
-			if found and found.name == entry.name then
-				body_hashes[entry.name] = resolve.hash_node(bufnr, found.node)
+			if found then
+				-- Key everything by resolve's canonical (treesitter-resolved) name,
+				-- never by whatever name the LLM reported, so cache.merge and
+				-- recall.show (which also keys by resolve's name) agree.
+				body_hashes[found.name] = resolve.hash_node(bufnr, found.node)
+				table.insert(resolved_entries, {
+					name = found.name,
+					start_line = found.start_line,
+					end_line = found.end_line,
+					explanation = entry.explanation,
+				})
 				vim.api.nvim_buf_set_extmark(bufnr, ns, found.start_line - 1, 0, {
 					end_row = found.end_line - 1,
 				})
 			end
 		end
 
+		if #resolved_entries == 0 then
+			vim.notify("review-explain: no functions could be resolved in selection", vim.log.levels.WARN)
+			return
+		end
+
 		local cwd = vim.fn.getcwd()
 		local cache_path = cache.cache_path(cwd .. "/" .. M.config.cache_dirname, filepath, cwd)
-		cache.merge(cache_path, entries, body_hashes)
+		cache.merge(cache_path, resolved_entries, body_hashes)
 
-		vim.notify(string.format("review-explain: explained %d function(s)", #entries), vim.log.levels.INFO)
+		vim.notify(
+			string.format("review-explain: explained %d function(s)", #resolved_entries),
+			vim.log.levels.INFO
+		)
 	end)
 end
 
