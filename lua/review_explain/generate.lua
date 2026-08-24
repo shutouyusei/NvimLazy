@@ -13,11 +13,22 @@ M.config = {
 
 local ns = vim.api.nvim_create_namespace("review_explain")
 
+-- Re-entrancy guard: tracks buffers with an in-flight `claude -p` call so a
+-- repeated keypress doesn't fire overlapping requests that could race writing
+-- to the same cache file.
+---@type table<integer, boolean>
+local in_flight = {}
+
 ---Explain every top-level function in the given (0-indexed, inclusive) range.
 ---@param bufnr integer
 ---@param start_lnum integer
 ---@param end_lnum integer
 function M.run(bufnr, start_lnum, end_lnum)
+	if in_flight[bufnr] then
+		vim.notify("review-explain: a request is already in flight for this buffer", vim.log.levels.WARN)
+		return
+	end
+
 	local filepath = vim.api.nvim_buf_get_name(bufnr)
 	if filepath == "" then
 		vim.notify("review-explain: buffer has no file path", vim.log.levels.ERROR)
@@ -29,13 +40,21 @@ function M.run(bufnr, start_lnum, end_lnum)
 
 	vim.notify("review-explain: asking Claude...", vim.log.levels.INFO)
 
+	in_flight[bufnr] = true
 	client.run({
 		system_prompt = prompt.SYSTEM_PROMPT,
 		user_message = prompt.build_user_message(code, filepath, filetype),
 		model = M.config.model,
 	}, function(ok, stdout_or_err)
+		in_flight[bufnr] = nil
+
 		if not ok then
 			vim.notify("review-explain: " .. stdout_or_err, vim.log.levels.ERROR)
+			return
+		end
+
+		if not vim.api.nvim_buf_is_valid(bufnr) then
+			vim.notify("review-explain: buffer no longer valid, discarding result", vim.log.levels.WARN)
 			return
 		end
 
@@ -49,14 +68,38 @@ function M.run(bufnr, start_lnum, end_lnum)
 			return
 		end
 
+		---Check whether the LLM-reported name and the treesitter-resolved name
+		---plausibly refer to the same function, tolerating a qualified name on
+		---either side (e.g. entry.name="M.foo" vs found.name="foo").
+		---@param entry_name string
+		---@param found_name string
+		---@return boolean
+		local function names_corroborate(entry_name, found_name)
+			if entry_name == found_name then
+				return true
+			end
+			if entry_name:sub(-(#found_name + 1)) == "." .. found_name
+				or entry_name:sub(-(#found_name + 1)) == ":" .. found_name
+			then
+				return true
+			end
+			if found_name:sub(-(#entry_name + 1)) == "." .. entry_name
+				or found_name:sub(-(#entry_name + 1)) == ":" .. entry_name
+			then
+				return true
+			end
+			return false
+		end
+
 		local body_hashes = {}
 		local resolved_entries = {}
+		local unresolved_count = 0
 		for _, entry in ipairs(entries) do
 			-- entry.start_line is 1-indexed relative to the selection; translate
 			-- to an absolute 0-indexed buffer line to search from.
 			local abs_lnum = start_lnum + entry.start_line - 1
 			local found = resolve.find_enclosing_function(bufnr, abs_lnum)
-			if found then
+			if found and names_corroborate(entry.name, found.name) then
 				-- Key everything by resolve's canonical (treesitter-resolved) name,
 				-- never by whatever name the LLM reported, so cache.merge and
 				-- recall.show (which also keys by resolve's name) agree.
@@ -70,7 +113,16 @@ function M.run(bufnr, start_lnum, end_lnum)
 				vim.api.nvim_buf_set_extmark(bufnr, ns, found.start_line - 1, 0, {
 					end_row = found.end_line - 1,
 				})
+			else
+				unresolved_count = unresolved_count + 1
 			end
+		end
+
+		if unresolved_count > 0 then
+			vim.notify(
+				string.format("review-explain: %d function(s) could not be resolved", unresolved_count),
+				vim.log.levels.WARN
+			)
 		end
 
 		if #resolved_entries == 0 then
@@ -78,8 +130,8 @@ function M.run(bufnr, start_lnum, end_lnum)
 			return
 		end
 
-		local cwd = vim.fn.getcwd()
-		local cache_path = cache.cache_path(cwd .. "/" .. M.config.cache_dirname, filepath, cwd)
+		local root = vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd()
+		local cache_path = cache.cache_path(root .. "/" .. M.config.cache_dirname, filepath, root)
 		cache.merge(cache_path, resolved_entries, body_hashes)
 
 		vim.notify(
