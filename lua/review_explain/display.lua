@@ -7,7 +7,7 @@ local M = {}
 ---@return integer winnr
 function M.show(lines, opts)
 	opts = opts or {}
-	vim.lsp.util.open_floating_preview(lines, "markdown", vim.tbl_extend("force", {
+	return vim.lsp.util.open_floating_preview(lines, "markdown", vim.tbl_extend("force", {
 		border = "rounded",
 		focusable = false,
 	}, opts))
