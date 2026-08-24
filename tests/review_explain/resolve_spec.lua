@@ -22,6 +22,56 @@ describe("review_explain.resolve.find_enclosing_function", function()
     assert.equal(4, found.end_line)
   end)
 
+  it("finds a dot-indexed function (function M.foo() end)", function()
+    local bufnr = make_lua_buffer({
+      "function M.find_enclosing_function(bufnr, lnum)",
+      "  local node = get_node(bufnr, lnum)",
+      "  return node",
+      "end",
+    })
+    local found = resolve.find_enclosing_function(bufnr, 1)
+    assert.is_table(found)
+    assert.equal("find_enclosing_function", found.name)
+  end)
+
+  it("finds a method-indexed function (function M:method() end)", function()
+    local bufnr = make_lua_buffer({
+      "function Parser:parse(source)",
+      "  local tree = self:build_tree(source)",
+      "  return tree",
+      "end",
+    })
+    local found = resolve.find_enclosing_function(bufnr, 1)
+    assert.is_table(found)
+    assert.equal("parse", found.name)
+  end)
+
+  it("finds an assignment-style anonymous function (M.foo = function() end)", function()
+    local bufnr = make_lua_buffer({
+      "M.process = function(data)",
+      "  return data * 2",
+      "end",
+    })
+    local found = resolve.find_enclosing_function(bufnr, 1)
+    assert.is_table(found)
+    assert.equal("process", found.name)
+  end)
+
+  it("resolves to the innermost function, not a parent function", function()
+    local bufnr = make_lua_buffer({
+      "local function outer()",
+      "  M.inner = function()",
+      "    local y = 42",
+      "  end",
+      "end",
+    })
+    -- lnum 2 is the line with "M.inner = function()"
+    local found = resolve.find_enclosing_function(bufnr, 2)
+    assert.is_table(found)
+    assert.equal("inner", found.name)
+    assert.is_not.equal("outer", found.name)
+  end)
+
   it("returns nil when the line is outside any function", function()
     local bufnr = make_lua_buffer({
       "local x = 1",
