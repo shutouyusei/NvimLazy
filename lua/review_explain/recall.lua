@@ -99,6 +99,49 @@ function M.show(bufnr)
 	end)
 end
 
+---Color a rectangular box over [start_row, end_row] (0-indexed, inclusive)
+---sized to the widest line in that range, rather than the full window
+---width: `hl_eol` highlights to the edge of the window, which looks like a
+---full-width band rather than a box fitted to the code. Shorter lines get
+---virtual-text padding in the same color so every row's right edge lines
+---up with the widest one.
+---@param bufnr integer
+---@param ns integer
+---@param start_row integer
+---@param end_row integer
+---@param hl_group string
+local function highlight_box(bufnr, ns, start_row, end_row, hl_group)
+	local lines = vim.api.nvim_buf_get_lines(bufnr, start_row, end_row + 1, false)
+
+	local max_width = 0
+	for _, line in ipairs(lines) do
+		max_width = math.max(max_width, vim.fn.strdisplaywidth(line))
+	end
+
+	for i, line in ipairs(lines) do
+		local row = start_row + i - 1
+		local byte_len = #line
+
+		if byte_len > 0 then
+			vim.api.nvim_buf_set_extmark(bufnr, ns, row, 0, {
+				end_col = byte_len,
+				hl_group = hl_group,
+				hl_mode = "blend",
+				priority = 100,
+			})
+		end
+
+		local pad = max_width - vim.fn.strdisplaywidth(line)
+		if pad > 0 then
+			vim.api.nvim_buf_set_extmark(bufnr, ns, row, byte_len, {
+				virt_text = { { string.rep(" ", pad), hl_group } },
+				virt_text_pos = "eol",
+				priority = 100,
+			})
+		end
+	end
+end
+
 ---Highlight every function in the buffer that has a cached explanation,
 ---so explained functions are visible at a glance without pressing K on
 ---each one. Functions whose content matches the cached revision exactly
@@ -122,14 +165,7 @@ function M.highlight_buffer(bufnr)
 		if best then
 			local box_group = best.stale and "ReviewExplainStale" or "ReviewExplainExplained"
 			local sign_group = best.stale and "ReviewExplainStaleSign" or "ReviewExplainExplainedSign"
-			vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, fn.start_line - 1, 0, {
-				end_row = fn.end_line - 1,
-				end_col = 0,
-				hl_group = box_group,
-				hl_eol = true,
-				hl_mode = "blend",
-				priority = 100,
-			})
+			highlight_box(bufnr, highlight_ns, fn.start_line - 1, fn.end_line - 1, box_group)
 			for row = fn.start_line - 1, fn.end_line - 1 do
 				vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, row, 0, {
 					sign_text = "▎",
