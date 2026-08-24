@@ -130,7 +130,7 @@ function M.run(bufnr, start_lnum, end_lnum)
 			return
 		end
 
-		local root = vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd()
+		local root = cache.resolve_root(bufnr)
 		local cache_path = cache.cache_path(root .. "/" .. M.config.cache_dirname, filepath, root)
 		cache.merge(cache_path, resolved_entries, body_hashes)
 

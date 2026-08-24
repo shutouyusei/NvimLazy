@@ -11,6 +11,49 @@ describe("review_explain.cache.cache_path", function()
     local path = cache.cache_path("/proj/.nvim-review", "/proj/src/foo.lua", "/proj")
     assert.equal("/proj/.nvim-review/src/foo.lua.json", path)
   end)
+
+  it("maps a diffview.nvim virtual buffer name to the same path as the real file", function()
+    -- Real diffview.nvim buffer names, confirmed against the installed
+    -- plugin: diffview://<root>/<git-dir-name>/<rev>/<path>. <git-dir-name>
+    -- is typically ".git"; <rev> is an abbreviated hash or a stage marker.
+    local real = cache.cache_path("/proj/.nvim-review", "/proj/src/foo.lua", "/proj")
+    local diffview_commit = cache.cache_path(
+      "/proj/.nvim-review",
+      "diffview:///proj/.git/a1b2c3d4e5f/src/foo.lua",
+      "/proj"
+    )
+    local diffview_stage = cache.cache_path("/proj/.nvim-review", "diffview:///proj/.git/:0:/src/foo.lua", "/proj")
+    assert.equal(real, diffview_commit)
+    assert.equal(real, diffview_stage)
+  end)
+
+  it("leaves a diffview path under a different root unchanged (falls through)", function()
+    local other = "diffview:///other-root/abc/src/foo.lua"
+    local path = cache.cache_path("/proj/.nvim-review", other, "/proj")
+    assert.equal("/proj/.nvim-review/" .. other .. ".json", path)
+  end)
+end)
+
+describe("review_explain.cache.resolve_root", function()
+  it("extracts the root directly from a diffview buffer name, regardless of cwd", function()
+    -- vim.fs.root() cannot resolve "diffview://" names (they aren't real
+    -- filesystem paths) and falls back to getcwd(), which is unreliable --
+    -- this must work correctly even when cwd is something else entirely.
+    local bufnr = vim.api.nvim_create_buf(false, false)
+    vim.api.nvim_buf_set_name(bufnr, "diffview:///some/project/.git/abc123/src/foo.lua")
+    assert.equal("/some/project", cache.resolve_root(bufnr))
+  end)
+
+  it("matches the root a real file buffer under the same project would resolve to", function()
+    local dir = tmp_dir()
+    vim.fn.system({ "git", "init", "-q", dir })
+    local real_bufnr = vim.api.nvim_create_buf(false, false)
+    vim.api.nvim_buf_set_name(real_bufnr, dir .. "/src/foo.lua")
+    local dv_bufnr = vim.api.nvim_create_buf(false, false)
+    vim.api.nvim_buf_set_name(dv_bufnr, "diffview://" .. dir .. "/.git/abc123/src/foo.lua")
+
+    assert.equal(cache.resolve_root(real_bufnr), cache.resolve_root(dv_bufnr))
+  end)
 end)
 
 describe("review_explain.cache read/write/merge", function()

@@ -1,14 +1,67 @@
 local M = {}
 
+---diffview.nvim names its file panes `diffview://<root>/<git-dir-name>/<rev>/<path>`
+---(see diffview/vcs/file.lua: `pl:join("diffview://", self.adapter.ctx.dir,
+---context, self.path)` -- `ctx.dir` is the git-dir, e.g. `<root>/.git`, not
+---`root` itself). The root is embedded directly in the buffer name, so it
+---can be extracted without filesystem lookups -- important because
+---`vim.fs.root()` cannot resolve a "diffview://" name at all (it isn't a
+---real filesystem path, so ascending-directory stat checks never succeed)
+---and silently falls back to whatever `getcwd()` happens to be at call
+---time, which is not reliably the project root.
+---
+---Best-effort: assumes the git-dir-name segment is literally ".git" (true
+---for a normal, non-worktree repo). For a linked git worktree this pattern
+---won't match and the caller should fall back to its normal root
+---resolution.
+---@param filepath string
+---@return string|nil root
+---@return string|nil rel_path path relative to root
+local function parse_diffview_path(filepath)
+	return filepath:match("^diffview://(.-)/%.git/[^/]+/(.*)$")
+end
+
+---Resolve the project root for a buffer, correctly for diffview.nvim's
+---virtual buffers as well as real files. Prefer this over calling
+---`vim.fs.root()` directly whenever the buffer might be a diffview pane.
+---@param bufnr integer
+---@return string
+function M.resolve_root(bufnr)
+	local filepath = vim.api.nvim_buf_get_name(bufnr)
+	local dv_root = parse_diffview_path(filepath)
+	if dv_root then
+		return dv_root
+	end
+	return vim.fs.root(bufnr, { ".git" }) or vim.fn.getcwd()
+end
+
+---Map a diffview.nvim virtual buffer name back to the real file's path it
+---represents, so explanations generated in a diffview pane share a cache
+---entry with the real file, and vice versa -- the same function's
+---body_hash is identical either way, so this is safe: it's still the
+---resolve.lua name+hash pair that decides whether a lookup actually
+---matches, this just ensures generate/recall agree on WHICH cache file to
+---look in. Returns `filepath` unchanged if it isn't a diffview buffer name.
+---@param filepath string
+---@return string
+local function normalize_diffview_path(filepath)
+	local root, rel = parse_diffview_path(filepath)
+	if not root or not rel then
+		return filepath
+	end
+	return root .. "/" .. rel
+end
+
 ---Compute the cache file path for a source file.
 ---@param cache_root string absolute path to the `.nvim-review` directory
----@param filepath string absolute path to the source file
+---@param filepath string absolute path to the source file (or a
+---  diffview.nvim virtual buffer name for the same file)
 ---@param cwd string absolute path of the project root
 ---@return string
 function M.cache_path(cache_root, filepath, cwd)
-	local rel = filepath
-	if vim.startswith(filepath, cwd .. "/") then
-		rel = filepath:sub(#cwd + 2)
+	local rel = normalize_diffview_path(filepath)
+	if vim.startswith(rel, cwd .. "/") then
+		rel = rel:sub(#cwd + 2)
 	end
 	return cache_root .. "/" .. rel .. ".json"
 end

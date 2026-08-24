@@ -3,6 +3,17 @@ return {
 		"neovim/nvim-lspconfig",
 		opts = {
 			servers = {
+				["*"] = {
+					keys = {
+						{
+							"K",
+							function()
+								require("review_explain.recall").show(0)
+							end,
+							desc = "Hover / cached explanation",
+						},
+					},
+				},
 				harper_ls = {
 					filetypes = {
 						"c",
