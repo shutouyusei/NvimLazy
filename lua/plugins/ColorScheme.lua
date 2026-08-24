@@ -25,4 +25,5 @@ return {
 			colorscheme = "catppuccin",
 		},
 	},
+	{ "folke/tokyonight.nvim", enabled = false },
 }
